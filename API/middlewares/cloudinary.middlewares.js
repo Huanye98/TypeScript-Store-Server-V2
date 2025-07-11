@@ -1,25 +1,36 @@
-const cloudinary = require("cloudinary").v2;
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
-const multer = require("multer");
+import { v2 as cloudinary } from "cloudinary";
+import CloudinaryStorage from "multer-storage-cloudinary"; 
+import multer from "multer";
+import dotenv from "dotenv";
+import e from "express";
 
-cloudinary.config({
+dotenv.config();
+
+const config = {
   cloud_name: process.env.CLOUDINARY_NAME,
   api_key: process.env.CLOUDINARY_KEY,
   api_secret: process.env.CLOUDINARY_SECRET,
-});
+};
+
+if (!config.cloud_name || !config.api_key || !config.api_secret) {
+  throw new Error("Missing Cloudinary environment variables");
+}
+
+cloudinary.config(config);
 
 const storage = new CloudinaryStorage({
   cloudinary,
-  params: {
-    folder: "my-app", 
-    allowed_formats: ["jpg", "png","webp"],
-    transformation:[{
-      quality:"auto",
-      fetch_format:"webp"
-    }]
-  },
+  params: async (req,file) => {
+    const ext = file.originalname.split('.').pop().toLowerCase();
+    const params = { 
+    folder: "my-app",
+    allowed_formats: ["jpg", "png", "webp","pdf"]
+  }
+  if(ext === "pdf") {
+    params.transformation = [{ quality: "auto", fetch_format: "webp" }];
+  }
+ return params;
+}
 });
 
-const uploader = multer({storage })
-
-module.exports = uploader
+export const uploader = multer({ storage });

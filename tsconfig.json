@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "commonjs",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["jest", "node"],
+    "allowJs": true,
+    "typeRoots": [
+      "./node_modules/@types",
+      "./types"
+    ],
+    
+    "rootDir": "./",
+    "outDir": "./dist",
+    "moduleResolution": "node"
+  },
+  "include": [
+    "**/*.ts",
+    "types/**/*.d.ts" ,
+    "types/expressTypes.d.ts",
+    "src",
+    "types"
+, "pupeteer/index.js", "API/routes/cloudinary.routes.js", "API/controllers/cloudinary.controller.js", "API/middlewares/cloudinary.middlewares.js"  ],
+  "exclude": [
+    "node_modules", 
+    "API/middlewares/cloudinary.middlewares.js",
+    "API/routes/cloudinary.routes.js"
+  ]
+}

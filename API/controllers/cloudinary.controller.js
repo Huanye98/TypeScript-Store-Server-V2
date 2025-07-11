@@ -1,6 +1,7 @@
-const uploader = require("../middlewares/cloudinary.middlewares");
+import {uploader} from "../middlewares/cloudinary.middlewares";
+import { Request, Response, NextFunction } from "express";
 
-const uploadImage = (req, res, next) => {
+const uploadImage = (req,res,next) => {
     if (!req.file) {
       res.status(400).json({
         errorMessage:
