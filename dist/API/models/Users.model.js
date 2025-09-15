@@ -292,16 +292,7 @@ const userGetTheirData = async (id) => {
         JSON_BUILD_OBJECT(
           'imageurl', products.imageurl,
           'product_name', products.name, 
-          'product_price', products.price,
-          'product_id', cart_items.product_id, 
-          'quantity', cart_items.quantity,
-          'discount', products.discountvalue,
-          'final_price',
-          CASE 
-            WHEN products.discountvalue < 0 OR products.discountvalue > 1 THEN products.price 
-            WHEN products.discountvalue > 0 AND products.discountvalue < 1 THEN products.price - (products.price * products.discountvalue)  
-            ELSE products.price  
-          END
+          'product_id', cart_items.product_id
         )
       ) AS cart_items
     FROM users

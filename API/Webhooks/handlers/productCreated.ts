@@ -54,6 +54,7 @@ export default async function productCreated(data:Data) {
         variant.printful_retail_price,
     ];
       await db.query(variantQuery, variantsQueryArray);
+      
     }
     
   } catch (error) {

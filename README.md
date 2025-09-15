@@ -1,176 +1,64 @@
-# Canvas&Chaos
+# [Typecript-Store-v2] 
 
-## [See the App!] https://canvasandchaos.netlify.app/
+> **Status: Work In Progress/ Proof of Concept**
 
-## Description
+> This repository documents my deep dive into advanced backend development. It's an evolving project where I'm tackling complex e-commerce problems like database architecture for product variants, third-party API integration (Printful), and asynchronous order workflows. **This is not a finished product; it's also a portfolio of my learning process, architectural decisions, and the challenges I'm working through.**
 
-The page is part of a full-stack web application built with a TypeScript React front-end, an Express back-end, and a PostgreSQL database. The interface uses Material-UI (MUI) for a polished, responsive, and modern design.
+## A note on this project's purpose
+When I started this project, I had no understanding of backend architecture. Database schemas, Api design, and payment flows all felt like a black box. My earlier projects were built in a very naive way, if something worked I moved on, without thinking about scalability, maintainability, or best practices.
 
-#### [Repository Link Client] https://github.com/Huanye98/Typescript-Store-Client
+## Overview & evolution
+[Previous Project link] https://github.com/Huanye98/Typescript-Store-Server
 
-#### [Repository Link Server] https://github.com/Huanye98/Typescript-Store-Server
-
-## Backlog Functionalities
-
-- [ ] Email users with Nodemailer.
-- [ ] Implement the Printful API for shipping.
-
-## Technologies used
-
-NodeJS, Javascript, Express, JsonWebtoken, bcrypt, PostgreSQL, SQL,PG.
-
-# Server Structure
-
-## PostgreDatabase tables
+This is a major rewrite of a previous e-commerce backend , built with Typescript. The goal is to move beyong basic CRUD and explore the architecture of a real-world system.
 
 
+New features & Experiments
+ - More complex database: Redesigned SQL schema to support products with multiple options (e.g, T-shirt: size, color etc), and separation of internal and external orders using third-party services (Printful's print on demand)
+ - Implementation of printful api for print on demand (products and shippment), with webhooks for automatic database updates 
+ - Automated Invoicing: Pdf invoice generation with pupeteer (needs testing and debugging)
+ - Testing Suite: Implementation of Jest for unit testing. 
+ - Containerization: Includes a Dockerfile for potential future containerization.
 
-### Table: `cart`
+## Lessons Learned
 
-- **Purpose**: Stores the shopping cart details for users.
+As I kept building, I inevitable ran into walls. Designing a database that could handle simple and complex products (like T-shirts with sizes and colors) made me realize how tricky real-world modeling is. Supporting both Internal and external orders (via Printful) pushed me to think about how different flows interact without breaking the system.
 
-| Column Name | Data Type        | Constraints                     | Description                       |
-|-------------|------------------|---------------------------------|-----------------------------------|
-| `id`        | `integer`        | `PRIMARY KEY`, `NOT NULL`       | Unique identifier for the cart.  |
-| `user_id`   | `integer`        | `FOREIGN KEY`                  | References `users.id`.           |
-| `status`    | `text`           | `DEFAULT 'active'`             | Status of the cart.              |
-| `total`     | `numeric(10,2)`  | `DEFAULT 0`                    | Total cost of items in the cart. |
+The payment wall: integrating Stripe taught me that charging money isnt a single step. Services like Printful wait for Stripe's confirmation before moving forward, which meant I had to handle asyncronous events, webhook verification, retries and states where an order could get "stuck".
+Features like refunds, idempotency keys are not fully implemented yet, because I'm still learning the best way to handle them.
 
-**Relationships**:  
-- `user_id` → `users.id`
+I also started noticing how data structures and algorithms play into backend design. Seeing my Railway receipts made me realize that inefficient code could literally cost me money. That sparked my interest in learning DSA, so I can make more informed decisions and write better code.
 
----
+The biggest lesson is that the more I created, the more I realized that I needed to slow down, learn and investigate. Rushing ahead only led me into dead ends and burnout. Hitting walls forced me to pause dig deeper, and learn things the hard way.
 
-### Table: `cart_items`
+Even though the output I generate now isn't complete, and many features are still in progress, I've developed a real respect for these challenges. Instead of being intimidated by the "hard parts", I see them as opportunities to grow. This project is shifting my mindset from just building features to really learn how backend systems are designed.
 
-- **Purpose**: Tracks individual items in user carts.
+## Database Schema
+![Schema](./Assets/Sql%20schema.png)
 
-| Column Name   | Data Type        | Constraints                    | Description                                   |
-|---------------|------------------|--------------------------------|-----------------------------------------------|
-| `id`          | `integer`        | `PRIMARY KEY`, `NOT NULL`      | Unique identifier for each cart item.        |
-| `user_id`     | `integer`        | `NOT NULL`, `FOREIGN KEY`      | References `users.id`.                       |
-| `created_at`  | `timestamp`      | `DEFAULT CURRENT_TIMESTAMP`    | Timestamp of item creation.                  |
-| `updated_at`  | `timestamp`      | `DEFAULT CURRENT_TIMESTAMP`    | Timestamp of the last update.                |
-| `product_id`  | `integer`        | `FOREIGN KEY`                 | References `products.id`.                    |
-| `quantity`    | `integer`        | `DEFAULT 0`                    | Quantity of the product in the cart.         |
-| `cart_id`     | `integer`        | `FOREIGN KEY`                 | References `cart.id`.                        |
+## Known Issues & limitations
+This project is actively being worked on. Here are the specific challenges and open questions I'm curently grappling with:
+ - Pupperteer Invoicing: The PDF generation module is unstable and needs debugging for consisten output.
+ - Orders Crud: The Orders CRUD operations are not yet complete, which is blocking testing for invoice and fulfillments flows.
+ - Architectural Decidions:
+    - Final price calculation: I've implemente the final order price calculation on the server-side for internal orders. I'm actively researching the pros and cons of this approach versus doing the calculation directly in the SQL query or using a generated column in the database.
+    - Product Storage Optimization: I'm concerned about optimizing how product and variant data is store and retrieved. This has led me to start really thinking and learning Data Structures and Algorithms to make more informed decisions in the future.
+- Printful Api: The integration is started but not fully tested for all edge cases(handling out-of-stock items, webhook verification, etc)
 
-**Relationships**:  
-- `cart_id` → `cart.id`  
-- `product_id` → `products.id`  
-- `user_id` → `users.id`
+## Roadmap & To Do
+the immediate plan is as follows:
 
----
+- [ ] Complete the order crud operations.
+- [ ] Stabilize and debug the Pupeteer PDF invoice generator.
+- [ ] Finalize the Printful API integration for creating orders.
+- [ ] Write comprehensive tests for new features
+- [ ] Keep completing the Readme (Endpoint structures, thought behind the SQL database system, Screenshots of dataflows and processes)
 
-### Table: `collections`
+## Tech Stack
+- **Language**: TypeScript (Node.js)
+- **Database**: PostgreSQL
+- **Testing**: Jest
+- **Containerization**: Docker (planned)
+- **Third-Party Services**: Printful API for print-on-demand fulfillment
+- **Utilities**: Puppeteer for PDF generation
 
-- **Purpose**: Groups products into categories or themes.
-
-| Column Name   | Data Type          | Constraints                  | Description                       |
-|---------------|--------------------|-----------------------------|-----------------------------------|
-| `id`          | `integer`          | `PRIMARY KEY`, `NOT NULL`   | Unique identifier for collections.|
-| `name`        | `varchar(255)`     | `NOT NULL`                  | Name of the collection.           |
-| `is_featured` | `boolean`          | `DEFAULT false`             | Indicates if the collection is featured. |
-| `created_at`  | `timestamp`        | `DEFAULT CURRENT_TIMESTAMP` | Timestamp of collection creation. |
-
----
-
-### Table: `products`
-
-- **Purpose**: Stores details about available products.
-
-| Column Name       | Data Type       | Constraints                          | Description                                  |
-|-------------------|-----------------|--------------------------------------|----------------------------------------------|
-| `id`              | `integer`      | `PRIMARY KEY`, `NOT NULL`           | Unique identifier for the product.          |
-| `name`            | `text`         | `NOT NULL`                          | Name of the product.                        |
-| `price`           | `numeric(10,2)`| `NOT NULL`, `CHECK price >= 0`      | Price of the product.                       |
-| `description`     | `text`         |                                      | Product description.                        |
-| `isavaliable`     | `boolean`      | `DEFAULT false`                     | Indicates if the product is available.      |
-| `discountvalue`   | `numeric(10,2)`| `DEFAULT 1`, `CHECK discountvalue >= 0` | Discount applied to the product.           |
-| `imageurl`        | `text`         |                                      | URL of the product image.                   |
-| `category`        | `text`         | `CHECK category IN ('Print', 'Home goods', 'Apparel', 'Digital goods')` | Category of the product. |
-| `collection_id`   | `integer`      | `FOREIGN KEY`                       | References `collections.id`.                |
-| `is_featured`     | `boolean`      | `DEFAULT false`                     | Indicates if the product is featured.       |
-| `stock`           | `numeric(5,0)` | `DEFAULT 0`                         | Number of products in stock.                |
-| `created_at`      | `timestamp`    | `DEFAULT CURRENT_TIMESTAMP`         | Timestamp of product creation.              |
-| `items_sold`      | `integer`      | `DEFAULT 0`, `CHECK items_sold >= 0`| Number of items sold.                       |
-
-**Relationships**:  
-- `collection_id` → `collections.id`
-
----
-
-### Table: `transactions`
-
-- **Purpose**: Tracks payment details for orders.
-
-| Column Name      | Data Type       | Constraints                          | Description                          |
-|------------------|-----------------|--------------------------------------|--------------------------------------|
-| `id`             | `integer`      | `PRIMARY KEY`, `NOT NULL`           | Unique identifier for the transaction. |
-| `payment_id`     | `varchar(255)` | `NOT NULL`                          | Payment processor ID.                |
-| `user_id`        | `integer`      | `NOT NULL`, `FOREIGN KEY`           | References `users.id`.               |
-| `amount`         | `numeric(10,2)`| `NOT NULL`                          | Total amount for the transaction.    |
-| `currency`       | `varchar(10)`  | `NOT NULL`                          | Currency type (e.g., USD).           |
-| `status`         | `varchar(50)`  | `NOT NULL`                          | Status of the transaction (e.g., success).|
-| `client_secret`  | `varchar(255)` |                                      | Client secret for payment.           |
-| `created_at`     | `timestamp`    | `DEFAULT now()`                     | Timestamp of transaction creation.   |
-| `updated_at`     | `timestamp`    | `DEFAULT now()`                     | Timestamp of last update.            |
-
----
-
-### Table: `users`
-
-- **Purpose**: Stores user details and roles.
-
-| Column Name  | Data Type       | Constraints                      | Description                                  |
-|--------------|-----------------|----------------------------------|---------------------------------------------|
-| `id`         | `integer`       | `PRIMARY KEY`, `NOT NULL`       | Unique identifier for each user.            |
-| `email`      | `varchar(255)`  | `NOT NULL`, `UNIQUE`            | User's email address.                       |
-| `password`   | `text`          | `NOT NULL`                      | User's hashed password.                     |
-| `role`       | `user_role`     | `DEFAULT 'user'`                | User role (e.g., admin, user).              |
-| `name`       | `varchar(15)`   | `DEFAULT 'undefined'`           | User's name.                                |
-| `address`    | `text`          |                                  | User's physical address.                    |
-| `cart_id`    | `integer`       | `FOREIGN KEY`                   | References `cart.id`.                       |
-| `created_at` | `timestamp`     | `DEFAULT CURRENT_TIMESTAMP`     | Timestamp of account creation.              |
-| `updated_at` | `timestamp`     | `DEFAULT CURRENT_TIMESTAMP`     | Timestamp of the last update.               |
-
----
-
-
-## API Endpoints
-
-| HTTP Method | URL                              | Request Body                                                                                             | Success Status | Error Status | Description                                             |
-| ----------- | -------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------- | ------------ | ------------------------------------------------------- |
-| POST        | `/users/create`                  | `{email, password}`                                                                                      | 201            | 400          | Registers the user in the database.                     |
-| POST        | `/users/login`                   | `{email, password, role}`                                                                                | 200            | 400          | Validates credentials, creates, and sends a token.      |
-| GET         | `/auth/verify`                   | `req.headers.authorization`                                                                              | 200            | 403          | Verifies the user's token.                              |
-| GET         | `/products/all`                  | `N/A`                                                                                                    | 200            | 404          | Retrieves all products.                                 |
-| GET         | `/products`                      | `{id, category, collection, sort, isavaliable, is_featured, page, limit, search,}`                       | 200            | 404          | Retrieves all products.                                 |
-| POST        | `/products/create`               | `{name, price, description,isavaliable,discountvalue,imageurl,category,collection_id,is_featured,stock}` | 201            | 400          | Adds a new product to the database (Admin only).        |
-| PATCH       | `/products/:productId`           | `{name, price, description,isavaliable,discountvalue,imageurl,category,collection_id,is_featured,stock}` | 200            | 400/404      | Updates the specified product (Admin only).             |
-| DELETE      | `/products/:productId`           | `N/A`                                                                                                    | 200            | 404          | Deletes the specified product (Admin only).             |
-| POST        | `/payment/create-payment-intent` | `{paymentId, userId, amount, currency,status,clientSecret}`                                              | 201            | 400/500      | Initiates payment with Stripe.                          |
-| PATCH       | `/payment/update-payment-intent` | `{paymentIntentId, clientSecret}`                                                                        | 200            | 400/500      | Updates Stripe payment details.                         |
-| POST        | `/upload`                        | `{Image file}`                                                                                           | 201            | 400          | Uploads images via Cloudinary (Admin only).             |
-| GET         | `/users/all`                     | `N/A`                                                                                                    | 200            | 403          | Retrieves all user data (Admin only).                   |
-| GET         | `/users/:id`                     | `N/A`                                                                                                    | 200            | 404          | Retrieves the user's profile information.               |
-| PATCH       | `/users/modify/:id`              | `{email, address, password, user_id}`                                                                    | 200            | 400          | Updates the user's profile.                             |
-| DELETE      | `/users/:id`                     | ` {req.user.id, req.user.role}`                                                                            | 200            | 403/404      | Deletes the user's account after verification.          |
-| POST        | `/cart`                          | `{product_id,quantity,user_id,cart_id}`                                                                  | 200            | 400          | Adds a product to the user's cart.                      |
-| DELETE      | `/cart/:cart_id`                 | `{product_id, quantity, user_id }`                                                                       | 200            | 404          | Removes an item from the user's cart.                   |
-| DELETE      | `/users/cart/:cart_id`           | `{cart_id}`                                                                                              | 200            | 404          | Empties the user's cart after a successful transaction. |
-
-## Links
-
-### Collaborators
-
-[Huanye zhu]
-https://github.com/Huanye98?tab=repositories
-
-### Project
-
-[Repository Link Client] https://github.com/Huanye98/Typescript-Store-Client
-
-[Repository Link Server] https://github.com/Huanye98/Typescript-Store-Server
-
-[Deploy Link] https://canvasandchaos.netlify.app/

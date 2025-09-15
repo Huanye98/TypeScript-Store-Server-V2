@@ -1,6 +1,5 @@
 const Product = require("../models/Product.model");
 import { Request, Response, NextFunction } from "express";
-import { get } from "http";
 
 const getAllProducts = async (
   req: Request,
@@ -114,6 +113,30 @@ const patchProduct = async (
     next(error);
   }
 };
+const patchVariant = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const updates = req.body;
+    const { variantId } = req.params;
+    if (!variantId ) {
+      return res
+        .status(400)
+        .json({ error: "Variant ID and updates are required" });
+    }
+    if ( !updates) {
+      return res
+        .status(400)
+        .json({ error: "Updates are required" });
+    }
+    const updatedVariant = await Product.patchVariant(variantId, updates);
+    res.status(200).json(updatedVariant);
+  } catch (error) {
+    next(error);
+  }
+};
 
 module.exports = {
   getProducts,
@@ -121,6 +144,7 @@ module.exports = {
   deleteProduct,
   deleteVariant,
   patchProduct,
+  patchVariant,
   getAllProducts,
   getProductById
 };

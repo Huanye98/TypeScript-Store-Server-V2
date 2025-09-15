@@ -1,10 +1,12 @@
 import { Filters } from "../../Types";
 import {
   Product,
-  Updates,
   VariantInput,
   ProductInput,
   VariantUpdates,
+  VariantFile,
+  VariantOption,
+  ProductUpdates,
 } from "../../Types/Products";
 const db = require("../../db/index");
 
@@ -268,6 +270,20 @@ const createVariants = async (
   if (variants) {
     const allowedColumns = ["stock", "retail_price", "image_url", "sku"];
     for (const variant of variants) {
+      if (variant.options) {
+        let priceModifiers = Object.values(variant.options).reduce(
+          (sum, inner) => {
+            return (
+              sum +
+              Object.values(inner).reduce((innersum, num) => innersum + num, 0)
+            );
+          },
+          0
+        );
+        variant.retail_price =
+          base_price * (1 - discount_value) + priceModifiers;
+      }
+
       const columns = ["product_id"];
       const values: (string | number | boolean)[] = [product_id];
       Object.entries(variant).forEach(([key, value]) => {
@@ -380,14 +396,26 @@ const findAndDeleteProduct = async (id: number) => {
     );
   }
 };
-const deleteVariant = async (id: number) => {
-  const query = "alter table variants delete row where id = $1";
+const findAndDeleteVariant = async (id: number) => {
+  if (!id) {
+    throw new Error("Variant ID is required for deletion.");
+  }
+  const query = "delete from variants where id = $1";
   try {
-    await db(query, [id]);
-  } catch (error) {}
+    const response = await db(query, [id]);
+    return response.rows[0];
+  } catch (error: unknown) {
+    let errorMessage = "An error occurred while deleting the variant.";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    throw new Error(
+      `Database Error: Failed to delete variant. ${errorMessage}`
+    );
+  }
 };
 
-const patchProductInDB = async (productId: number, updates: Updates) => {
+const patchProductInDB = async (productId: number, updates: ProductUpdates) => {
   if (!updates || Object.keys(updates).length === 0) {
     throw new Error("No updates have been provided");
   }
@@ -426,25 +454,81 @@ const patchProductInDB = async (productId: number, updates: Updates) => {
     );
   }
 };
-const patchVariant = async (variantId: number, variantUpdates: VariantUpdates,base_price:number) => {
-  if(variantUpdates.discount_value && base_price){
-    const retail_price = base_price *(1 - variantUpdates.discount_value)
-    variantUpdates.retail_price = retail_price;
+const patchVariant = async (
+  variantId: number,
+  variantUpdates: VariantUpdates
+) => {
+  const allowedFields = [
+    "sku",
+    "size",
+    "color",
+    "image_url",
+    "discount_value",
+    "retail_price",
+    "stock",
+    "is_default",
+  ];
+  const entries = Object.entries(variantUpdates).filter(([key]) =>
+    allowedFields.includes(key)
+  );
+  if (entries.length === 0) {
+    throw new Error("No valid updates provided for the variant.");
   }
-  const allowedFields = ["sku","size","color","image_url","discount_value","retail_price","stock","is_default"];
-  let query = `alter table variant update rows where id = $1 `;
-  let queryArray = [variantId];
+  const setClauses = entries.map(([key], index) => `${key} = $${index + 2}`);
+  const values = entries.map(([, value]) => value);
+  const query = `update variants set ${setClauses.join(
+    ", "
+  )} where id = $1 returning *`;
+
   try {
-    await db(query, []);
-  } catch (error) {}
+    const response = await db.query(query, [variantId, ...values]);
+    const optionResponse = await patchVariantOptions(variantUpdates.variant_options || []);
+    return { variant: response.rows[0], options: optionResponse };
+  } catch (error: unknown) {
+    let errorMessage = "An error occurred while updating the variant.";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    throw new Error(
+      `Database Error: Failed to update variant. ${errorMessage}`
+    );
+  }
+};
+
+const patchVariantOptions = async (options: VariantOption[]) => {
+  try {
+    const promises = options.map(async (option) => {
+      const query = `update variant_options set option_name = $1, option_value = $2, price_modifier = $3 where id = $4 returning *`;
+      const response = await db.query(query, [
+        option.option_name,
+        option.option_value,
+        option.price_modifier,
+        option.id,
+      ]);
+      return response;
+    });
+    const result = await Promise.all(promises);
+    const updatedOptions = result.map((res) => res.rows[0]);
+    return updatedOptions;
+    
+  } catch (error: unknown) {
+    let errorMessage = "An error occurred while updating variant options.";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    throw new Error(
+      `Database Error: Failed to update variant options. ${errorMessage}`
+    );
+  }
 };
 
 module.exports = {
   getProducts,
   createProduct,
   findAndDeleteProduct,
-  deleteVariant,
+  findAndDeleteVariant,
   patchProductInDB,
   queryAllProducts,
   getProductById,
+  patchVariant,
 };

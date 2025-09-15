@@ -8,7 +8,7 @@ router.post("/create", productController.createProduct)
 router.delete("/:productId",productController.deleteProduct )
 router.delete("/variant/:variantId", productController.deleteVariant)
 router.patch("/:productId", productController.patchProduct)
-
+router.patch("/variant/:variantId", productController.patchVariant)
 
 
 export default router

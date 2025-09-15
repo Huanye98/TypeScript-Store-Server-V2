@@ -37,12 +37,12 @@ export interface VariantInput {
   options: Record<string, Record<string, number>>;
 }
 
-export interface Updates {
+export interface ProductUpdates {
   name: string;
   is_printful: string;
   discountvalue: number;
   finalPrice: number;
-  price: number;
+  base_price: number;
   description: string;
   isavaliable: string;
   imageurl: string;
@@ -60,6 +60,19 @@ export interface VariantUpdates {
   retail_price?: number;
   stock?: number;
   is_default?: boolean;
+  variant_options?: VariantOption[];
+  variantFiles?: VariantFile[];
+}
+export interface VariantOption {
+  id?: number;
+  option_name?: string;
+  option_value?: string;
+  price_modifier?: number;
+}
+export interface VariantFile{
+  variant_id?: number;
+  preview_url?: string;
+  file_url?: string;
 }
 export interface CartItem {
   imageurl: string;

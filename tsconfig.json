@@ -28,6 +28,7 @@
   "exclude": [
     "node_modules", 
     "API/middlewares/cloudinary.middlewares.js",
-    "API/routes/cloudinary.routes.js"
+    "API/routes/cloudinary.routes.js",
+    "Tests/**"
   ]
 }

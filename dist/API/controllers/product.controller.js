@@ -21,7 +21,7 @@ const getProducts = async (req, res, next) => {
     }
 };
 const getProductById = async (req, res, next) => {
-    const productId = req.params.productId;
+    const { productId } = req.params;
     if (!productId) {
         return res.status(400).json({ message: "productId is required" });
     }
@@ -62,6 +62,22 @@ const deleteProduct = async (req, res, next) => {
         next(error);
     }
 };
+const deleteVariant = async (req, res, next) => {
+    const { variantId } = req.params;
+    if (!variantId) {
+        return res.status(400).json({ message: "VariantId is required" });
+    }
+    try {
+        const deletedVariant = await Product.deleteVariant(variantId);
+        if (!deletedVariant) {
+            return res.status(404).json({ message: "Variant not found" });
+        }
+        res.status(200).json(deletedVariant);
+    }
+    catch (error) {
+        next(error);
+    }
+};
 const patchProduct = async (req, res, next) => {
     try {
         const updates = req.body;
@@ -78,11 +94,34 @@ const patchProduct = async (req, res, next) => {
         next(error);
     }
 };
+const patchVariant = async (req, res, next) => {
+    try {
+        const updates = req.body;
+        const { variantId } = req.params;
+        if (!variantId) {
+            return res
+                .status(400)
+                .json({ error: "Variant ID and updates are required" });
+        }
+        if (!updates) {
+            return res
+                .status(400)
+                .json({ error: "Updates are required" });
+        }
+        const updatedVariant = await Product.patchVariant(variantId, updates);
+        res.status(200).json(updatedVariant);
+    }
+    catch (error) {
+        next(error);
+    }
+};
 module.exports = {
     getProducts,
     createProduct,
     deleteProduct,
+    deleteVariant,
     patchProduct,
+    patchVariant,
     getAllProducts,
     getProductById
 };

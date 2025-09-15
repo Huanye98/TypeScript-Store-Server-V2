@@ -132,9 +132,9 @@ const getProductById = async (id) => {
     variants.size,
     variants.color,
     variants.image_url,
-    variants.stock
-    variant_files.file_url
-    variant_files.preview_url
+    variants.stock,
+    variant_files.file_url,
+    variant_files.preview_url,
     variant_options.option_value
   from products 
   Left JOIN variants
@@ -142,7 +142,7 @@ const getProductById = async (id) => {
     and variants.is_default = true
   Left JOIN variant_files 
    on variant_files.variant_id = variants.printful_variant_id
-  Left joint 
+  Left join variant_options
     on variant_options.variant_id = variants.printful_variant_id
   where products.id = $1`;
     try {
@@ -169,31 +169,24 @@ const getProductById = async (id) => {
     }
 };
 const createProduct = async (product) => {
-    const { name, base_price, description, isavaliable, imageurl, is_featured, artist, collection, type, category, options, variants, } = product;
+    const { name, base_price, description, isavaliable, imageurl, is_featured, artist, collection, product_type, category, options, discount_value, variants, } = product;
     let query = `insert into products (name, base_price`;
     const values = [name, base_price];
-    //add fields to qury and values array
-    const fields = [
-        name,
-        base_price,
-        description,
-        isavaliable,
-        imageurl,
-        is_featured,
-        artist,
-        collection,
-        type,
-        category,
-    ];
-    fields.forEach((field) => {
-        if (field !== undefined && field !== null) {
-            query += `, ${field}`;
-            values.push(field);
+    const fields = {
+        description: description,
+        isavaliable: isavaliable,
+        imageurl: imageurl,
+        is_featured: is_featured,
+        artist: artist,
+        collection: collection,
+        product_type: product_type,
+        category: category,
+    };
+    Object.entries(fields).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+            query += `, ${key}`;
+            values.push(value);
         }
-    });
-    Object.entries(options).forEach(([key, value]) => {
-        query += `${key} `;
-        values.push(value.toString());
     });
     query += `) VALUES (${values
         .map((_, i) => `$${i + 1}`)
@@ -201,7 +194,10 @@ const createProduct = async (product) => {
     try {
         const res = await db.query(query, values);
         const product_id = res.rows[0].id;
-        await createVariants(variants, product_id);
+        await createVariants(variants, product_id, discount_value, base_price);
+        if (options) {
+            await createProductOptions(product_id, options);
+        }
         return res.rows[0];
     }
     catch (error) {
@@ -212,26 +208,54 @@ const createProduct = async (product) => {
         throw new Error(`Database Error: Failed to create product. ${errorMessage}`);
     }
 };
-const createVariants = async (variants, product_id) => {
-    for (const variant of variants) {
-        const columns = ["product_id",];
-        const values = [product_id];
-        Object.entries(variant).forEach(([key, value]) => {
-            if (value !== undefined && value !== null && key !== "options") {
-                columns.push(key);
-                values.push(value);
-            }
-        });
-        const placeholders = columns.map((_, i) => `$${i + 1}`).join(", ");
-        const query = `INSERT INTO variants (${columns.join(", ")}) VALUES (${placeholders}) RETURNING *`;
-        try {
-            const response = await db.query(query, values);
-            const variantId = response.rows[0].id;
+const createVariants = async (variants, product_id, discount_value, base_price) => {
+    if (variants) {
+        const allowedColumns = ["stock", "retail_price", "image_url", "sku"];
+        for (const variant of variants) {
             if (variant.options) {
-                for (const [name, value] of Object.entries(variant.options)) {
-                    await createVariantOption(variantId, name, value);
+                let priceModifiers = Object.values(variant.options).reduce((sum, inner) => {
+                    return (sum +
+                        Object.values(inner).reduce((innersum, num) => innersum + num, 0));
+                }, 0);
+                variant.retail_price =
+                    base_price * (1 - discount_value) + priceModifiers;
+            }
+            const columns = ["product_id"];
+            const values = [product_id];
+            Object.entries(variant).forEach(([key, value]) => {
+                if (value !== undefined &&
+                    value !== null &&
+                    key !== "options" &&
+                    allowedColumns.includes(key)) {
+                    columns.push(key);
+                    values.push(value);
+                }
+            });
+            const placeholders = columns.map((_, i) => `$${i + 1}`).join(", ");
+            const query = `INSERT INTO variants (${columns.join(", ")}) VALUES (${placeholders}) RETURNING *`;
+            try {
+                const response = await db.query(query, values);
+                const variantId = response.rows[0].id;
+                if (variant.options) {
+                    for (const [name, value] of Object.entries(variant.options)) {
+                        await createVariantOption(variantId, name, value);
+                    }
                 }
             }
+            catch (error) {
+                let errorMessage = "An error occurred while creating the variant.";
+                if (error instanceof Error) {
+                    errorMessage = error.message;
+                }
+                throw new Error(`Database Error: Failed to create variant. ${errorMessage}`);
+            }
+        }
+    }
+    else {
+        const retail_price = base_price * (1 - discount_value);
+        const query = `INSERT INTO variants (product_id,discount_value,retail_price,is_default) VALUES ($1, $2,$3,$4) RETURNING *`;
+        try {
+            await db.query(query, [product_id, discount_value, retail_price, true]);
         }
         catch (error) {
             let errorMessage = "An error occurred while creating the variant.";
@@ -244,9 +268,14 @@ const createVariants = async (variants, product_id) => {
 };
 const createVariantOption = async (variantId, name, value) => {
     for (const [option_value, price_modification] of Object.entries(value)) {
-        const query = `INSERT INTO variant_options (variant_id, option_name, option_value,price_modification) VALUES ($1, $2, $3,$4) RETURNING *`;
+        const query = `INSERT INTO variant_options (variant_id, option_name, option_value,price_modifier) VALUES ($1, $2, $3,$4) RETURNING *`;
         try {
-            await db.query(query, [variantId, name, option_value, price_modification]);
+            await db.query(query, [
+                variantId,
+                name,
+                option_value,
+                price_modification,
+            ]);
         }
         catch (error) {
             let errorMessage = "An error occurred while creating the variant option.";
@@ -254,6 +283,17 @@ const createVariantOption = async (variantId, name, value) => {
                 errorMessage = error.message;
             }
             throw new Error(`Database Error: Failed to create variant option. ${errorMessage}`);
+        }
+    }
+};
+const createProductOptions = async (product_id, options) => {
+    for (const [optionName, optionValues] of Object.entries(options)) {
+        try {
+            const query = `insert into options (product_id, name, value) values ($1, $2, $3) returning *`;
+            await db.query(query, [product_id, optionName, optionValues]);
+        }
+        catch (error) {
+            console.error(`Failed to insert option ${optionName}`, error);
         }
     }
 };
@@ -278,29 +318,46 @@ const findAndDeleteProduct = async (id) => {
     }
 };
 const findAndDeleteVariant = async (id) => {
-    const query = "alter table variants delete row where id = $1*";
-    try {
-        await db(query, [id]);
+    if (!id) {
+        throw new Error("Variant ID is required for deletion.");
     }
-    catch (error) { }
+    const query = "delete from variants where id = $1";
+    try {
+        const response = await db(query, [id]);
+        return response.rows[0];
+    }
+    catch (error) {
+        let errorMessage = "An error occurred while deleting the variant.";
+        if (error instanceof Error) {
+            errorMessage = error.message;
+        }
+        throw new Error(`Database Error: Failed to delete variant. ${errorMessage}`);
+    }
 };
 const patchProductInDB = async (productId, updates) => {
     if (!updates || Object.keys(updates).length === 0) {
         throw new Error("No updates have been provided");
     }
-    const sanitizedUpdates = Object.fromEntries(Object.entries(updates).map(([key, value]) => [
-        key,
-        value === "" ? null : value,
-    ]));
+    const allowedFields = [
+        "name",
+        "description",
+        "isavaliable",
+        "imageurl",
+        "category",
+        "is_featured",
+        "is_printful",
+        "artist",
+        "collection",
+        "base_price",
+        "product_type",
+    ];
+    const filteredUpdates = Object.entries(updates).filter(([key, value]) => value !== undefined && value !== null && allowedFields.includes(key));
+    const query = `update products set ${filteredUpdates
+        .map(([key], index) => `${key} = $${index + 1}`)
+        .join(", ")} where id = $${filteredUpdates.length + 1}`;
+    const values = filteredUpdates.map(([, value]) => value);
     try {
-        const fields = Object.keys(sanitizedUpdates);
-        const values = Object.values(sanitizedUpdates);
-        const addToQuery = fields
-            .map((field, index) => `${field} = $${index + 1}`)
-            .join(", ");
-        const query = `UPDATE products SET ${addToQuery} WHERE id = $${fields.length + 1}`;
-        await db.query(query, [...values, productId]);
-        return { message: "Product updated successfully" };
+        await db.query(query, [values, productId]);
     }
     catch (error) {
         let errorMessage = "An error occurred while updating the product.";
@@ -311,18 +368,67 @@ const patchProductInDB = async (productId, updates) => {
     }
 };
 const patchVariant = async (variantId, variantUpdates) => {
-    let query = `alter table variant update rows where id = $1 `;
-    let queryArray = [variantId];
-    try {
-        await db(query, []);
+    const allowedFields = [
+        "sku",
+        "size",
+        "color",
+        "image_url",
+        "discount_value",
+        "retail_price",
+        "stock",
+        "is_default",
+    ];
+    const entries = Object.entries(variantUpdates).filter(([key]) => allowedFields.includes(key));
+    if (entries.length === 0) {
+        throw new Error("No valid updates provided for the variant.");
     }
-    catch (error) { }
+    const setClauses = entries.map(([key], index) => `${key} = $${index + 2}`);
+    const values = entries.map(([, value]) => value);
+    const query = `update variants set ${setClauses.join(", ")} where id = $1 returning *`;
+    try {
+        const response = await db.query(query, [variantId, ...values]);
+        const optionResponse = await patchVariantOptions(variantUpdates.variant_options || []);
+        return { variant: response.rows[0], options: optionResponse };
+    }
+    catch (error) {
+        let errorMessage = "An error occurred while updating the variant.";
+        if (error instanceof Error) {
+            errorMessage = error.message;
+        }
+        throw new Error(`Database Error: Failed to update variant. ${errorMessage}`);
+    }
+};
+const patchVariantOptions = async (options) => {
+    try {
+        const promises = options.map(async (option) => {
+            const query = `update variant_options set option_name = $1, option_value = $2, price_modifier = $3 where id = $4 returning *`;
+            const response = await db.query(query, [
+                option.option_name,
+                option.option_value,
+                option.price_modifier,
+                option.id,
+            ]);
+            return response;
+        });
+        const result = await Promise.all(promises);
+        const updatedOptions = result.map((res) => res.rows[0]);
+        return updatedOptions;
+    }
+    catch (error) {
+        let errorMessage = "An error occurred while updating variant options.";
+        if (error instanceof Error) {
+            errorMessage = error.message;
+        }
+        throw new Error(`Database Error: Failed to update variant options. ${errorMessage}`);
+    }
 };
 module.exports = {
     getProducts,
     createProduct,
     findAndDeleteProduct,
+    findAndDeleteVariant,
     patchProductInDB,
     queryAllProducts,
     getProductById,
+    patchVariant,
 };
