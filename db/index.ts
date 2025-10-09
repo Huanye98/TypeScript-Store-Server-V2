@@ -2,10 +2,10 @@ import { Client } from "pg";
 require("dotenv").config();
 
 const db = new Client({
-  //   connectionString: process.env.DATABASE_URL,
-  //   ssl:{
-  //   rejectUnauthorized: false
-  // },
+    connectionString: process.env.DATABASE_URL,
+    ssl:{
+    rejectUnauthorized: false
+  },
   user: process.env.PGUSER,
   host: process.env.PGHOST,
   database: process.env.PGDATABASE,
